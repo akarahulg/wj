@@ -29,7 +29,7 @@ else
     echo "✅ All required LaTeX packages are installed."
 fi
 
-JOURNAL_DIR="$HOME/git/personal/secondbrain"
+JOURNAL_DIR="$HOME/secondbrain"
 mkdir -p "$JOURNAL_DIR"
 ENTRIES_DIR="$JOURNAL_DIR/entries"
 ENTRIES_TEX="$JOURNAL_DIR/entries.tex"
