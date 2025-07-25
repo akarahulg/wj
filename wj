@@ -1,0 +1,99 @@
+#!/bin/bash
+
+LATEX_TEMPLATE_URL="https://raw.githubusercontent.com/akarahulg/wj/refs/heads/main/main.tex"
+
+# --- Script ---
+required_packages=(
+    tufte-book
+    ulem
+    soul
+    hyperref
+    todonotes
+    xargs
+)
+
+missing=()
+
+for pkg in "${required_packages[@]}"; do
+    if ! kpsewhich "$pkg.sty" > /dev/null && ! kpsewhich "$pkg.cls" > /dev/null; then
+        missing+=("$pkg")
+    fi
+done
+
+if [ "${#missing[@]}" -ne 0 ]; then
+    echo "❌ Missing LaTeX packages:"
+    for pkg in "${missing[@]}"; do
+        echo "  - $pkg"
+    done
+else
+    echo "✅ All required LaTeX packages are installed."
+fi
+
+JOURNAL_DIR="$HOME/git/personal/secondbrain"
+mkdir -p "$JOURNAL_DIR"
+ENTRIES_DIR="$JOURNAL_DIR/entries"
+ENTRIES_TEX="$JOURNAL_DIR/entries.tex"
+JOURNAL_TEX="$JOURNAL_DIR/main.tex"
+
+DATE=$(date +%Y-%m-%d)
+LABELDATE=$(date +%y%m%d)
+FILENAME="$DATE.tex"
+FILEPATH="$ENTRIES_DIR/$FILENAME"
+
+mkdir -p "$ENTRIES_DIR"
+
+# Initialize journal.tex if not present by downloading it from the specified URL
+if [ ! -f "$JOURNAL_TEX" ]; then
+    echo "📔 main.tex not found. Downloading template from URL..."
+    # Check if curl is installed
+    if ! command -v curl &> /dev/null; then
+        echo "❌ Error: 'curl' is required to download the template, but it's not installed."
+        exit 1
+    fi
+
+    # Use curl to download the file. The flags are:
+    # -s: Silent mode (don't show progress meter)
+    # -S: Show an error message if it fails
+    # -L: Follow redirects (important for some raw URLs)
+    # -o: Output file name
+    if curl -sSL "$LATEX_TEMPLATE_URL" -o "$JOURNAL_TEX"; then
+        echo "✅ Template successfully downloaded to $JOURNAL_TEX"
+    else
+        echo "❌ Error: Failed to download template from $LATEX_TEMPLATE_URL"
+        echo "Please check the URL and your internet connection."
+        # Clean up the potentially empty/corrupted file
+        rm -f "$JOURNAL_TEX"
+        exit 1
+    fi
+fi
+
+# If entry already exists, just open it
+if [ -f "$FILEPATH" ]; then
+    echo "📓 Entry for $DATE already exists. Opening it..."
+    nvim "$FILEPATH"
+    exit 0
+fi
+
+# Create the new entry file with no title generated
+cat <<EOF > "$FILEPATH"
+% !TEX root = ../main.tex
+\\section{{\\bf $DATE}}
+
+\\vspace{1em}\\noindent\\rule{\\linewidth}{0.4pt}
+EOF
+
+
+# Add to entries.tex if not already included
+# This part of your script seems to be using a custom command \dailytasks
+# which is not defined in the LaTeX preamble you provided.
+# I'll keep your original logic. If you need a simple \input, you can change it.
+if ! grep -q "$FILENAME" "$ENTRIES_TEX"; then
+    # Assuming \dailytasks is a custom command in your actual template.
+    # If not, you might want: echo "\\input{entries/${FILENAME}}" >> "$ENTRIES_TEX"
+    echo "\\dailytasks{$LABELDATE}{entries/${FILENAME}}" >> "$ENTRIES_TEX"
+fi
+
+# Open the new entry
+nvim "$FILEPATH"
+
+echo "✅ New entry saved: $FILENAME"
