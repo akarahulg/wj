@@ -63,7 +63,7 @@ The intended workflow is simple and designed to get you writing as quickly as po
 1. Open your terminal and navigate to your project directory.
 2. Run the helper script:
    ```bash
-   ./journal.sh
+   ./wj
    ```
    The script will:
    - Download `main.tex` on first run.
@@ -76,6 +76,7 @@ The intended workflow is simple and designed to get you writing as quickly as po
    pdflatex main.tex
    pdflatex main.tex
    ```
+5. You can always add the `wj` file to your `~/.local/bin/` folder for easy calling the file. 
 
 ---
 
