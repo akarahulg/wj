@@ -4,7 +4,8 @@ This project provides a sophisticated, automated system for maintaining a person
 
 The workflow is streamlined by a companion shell script that automates the creation of daily entry files.
 
-*(You can replace this with a screenshot of your actual PDF output)*
+![Journal Sample](images/daily.png)
+![Lists](images/lists.png)
 
 ---
 
