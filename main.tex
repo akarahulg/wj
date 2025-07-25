@@ -1,0 +1,261 @@
+\documentclass[anyside]{tufte-book}
+
+% --- Packages ---
+\usepackage{xcolor}
+\usepackage{etoolbox}
+\usepackage{hyperref}
+\usepackage{amssymb}
+\usepackage{calc} % Needed for width calculations in minipage
+\usepackage{fontawesome5} 
+
+% --- Global Document Setup ---
+\setcounter{tocdepth}{-1}
+
+% --- Color Setup ---
+\definecolor{TaskImp}{HTML}{D9534F}
+\definecolor{TaskDone}{HTML}{428BCA}
+\definecolor{SubTaskDone}{HTML}{407076}
+\definecolor{TaskNote}{HTML}{5BC0DE}
+\definecolor{TaskLabel}{HTML}{777777}
+\definecolor{SubTask}{HTML}{333B3E}
+\definecolor{TaskBacklog}{HTML}{153131}
+\definecolor{TaskDefault}{HTML}{333B3E}
+\definecolor{TaskActive}{HTML}{9A031E}
+\definecolor{TaskBackground}{HTML}{EFEFEF} 
+\definecolor{IconColor}{HTML}{008B00}
+\definecolor{MarkerColor}{HTML}{50723C}
+
+\hypersetup{colorlinks=true, linkcolor=teal, urlcolor=cyan}
+
+% --- Counters ---
+\newcounter{tasknumber}
+\newcounter{subtasknumber}[tasknumber]
+\renewcommand{\thesubtasknumber}{\thetasknumber.\arabic{subtasknumber}}
+
+%%% ADDED: Counters for list totals
+\newcounter{counttodos}
+\newcounter{countbacklog}
+\newcounter{countdone}
+%%% END ADDED
+
+\makeatletter
+
+%%% ADDED: Logic to count tasks by hooking into \addcontentsline
+% We save the original command and then create a new one that first
+% increments our counters and then calls the original.
+\let\original@addcontentsline\addcontentsline
+\renewcommand{\addcontentsline}[3]{%
+    % Check the file extension (#1) and increment the correct counter
+    \ifstrequal{#1}{tdo}{\stepcounter{counttodos}}{}%
+    \ifstrequal{#1}{bkl}{\stepcounter{countbacklog}}{}%
+    \ifstrequal{#1}{odo}{\stepcounter{countdone}}{}%
+    % Now, execute the original command to write to the file
+    \original@addcontentsline{#1}{#2}{#3}%
+}
+%%% END ADDED
+
+
+% --- Key-Value System and Prefix Management (Stable) ---
+\usepackage{keyval}
+\gdef\CurrentTaskPrefix{}
+\newcommand{\dailytasks}[2]{%
+  \bgroup
+  \let\oldCurrentTaskPrefix\CurrentTaskPrefix
+  \gdef\CurrentTaskPrefix{#1-}%
+  \input{#2}%
+  \global\let\oldCurrentTaskPrefix\oldCurrentTaskPrefix
+  \egroup
+}
+\newif\ifTaskIsDone
+\newif\ifUserProvidedLabel
+\newif\ifUserProvidedDoneDate
+\newif\ifUserProvidedMarker
+\def\ShortTaskLabel{}
+\def\TaskDoneDate{} 
+\def\TaskMarker{}
+\def\taskcolor{}
+\define@key{task}{done}[true]{\TaskIsDonetrue}
+\define@key{task}{color}{\def\taskcolor{#1}}
+\define@key{task}{label}{\def\ShortTaskLabel{#1}\UserProvidedLabeltrue}
+\define@key{task}{donedate}{\def\TaskDoneDate{#1}\UserProvidedDoneDatetrue}
+\define@key{task}{marker}{\def\TaskMarker{#1}\UserProvidedMarkertrue} 
+
+% --- Internal Helper to Print the Marker ---
+\newcommand{\@printtaskmarker}{%
+    \ifUserProvidedMarker
+        \textcolor{MarkerColor}{\texttt{\,~\TaskMarker~}}%
+    \fi
+}
+
+% --- Master Task Creation Commands (Internal) ---
+\newcommand{\@createmaintask}[4][]{%
+    \bgroup
+    % Reset flags for this task
+    \TaskIsDonefalse
+    \UserProvidedLabelfalse
+    \UserProvidedDoneDatefalse
+    \UserProvidedMarkerfalse 
+    \def\ShortTaskLabel{}
+    \def\TaskDoneDate{}
+    \def\TaskMarker{} 
+    \def\taskcolor{#3}
+    \setkeys{task}{#1}
+    \refstepcounter{tasknumber}
+    \def\labelForToc{}
+    \ifUserProvidedLabel
+        \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
+        \phantomsection
+        \label{task:\FullTaskLabel}
+        \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#4}
+        \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
+    \fi
+    \ifTaskIsDone
+		\addcontentsline{odo}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
+    \else
+		\addcontentsline{#2}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
+    \fi
+
+    % --- REVISED PRINTING LOGIC with Optional Marker ---
+    \par\noindent
+    \ifTaskIsDone
+        % Logic for DONE tasks (no background)
+        \textcolor{IconColor}{\faCheck}
+        ~\textcolor{TaskDone}{\textbf{\thetasknumber:}}%
+        \ifUserProvidedDoneDate
+            \textcolor{magenta}{\texttt{\,[DD:\TaskDoneDate]}}%
+        \fi
+        \ifUserProvidedLabel
+            \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+        \fi
+        \@printtaskmarker
+		~#4%
+    \else
+        % Logic for PENDING tasks (with subtle background)
+        \colorbox{TaskBackground}{%
+            \begin{minipage}{\linewidth-2\fboxsep}
+            \textcolor{IconColor}{\faGenderless}
+            ~\textcolor{\taskcolor}{\textbf{\thetasknumber:}}%
+            \ifUserProvidedLabel
+                \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+            \fi
+            \@printtaskmarker
+            ~#4%
+            \end{minipage}%
+        }%
+    \fi
+    \par\vspace{1mm}
+    \egroup
+}
+
+\newcommand{\@createsubtask}[3][]{%
+    \bgroup
+    % Reset flags for this task
+    \TaskIsDonefalse
+    \UserProvidedLabelfalse
+    \UserProvidedDoneDatefalse
+    \UserProvidedMarkerfalse
+    \def\ShortTaskLabel{}
+    \def\TaskDoneDate{}
+    \def\TaskMarker{}
+    \def\taskcolor{SubTask}
+    \setkeys{task}{#1}
+    \refstepcounter{subtasknumber}
+    \def\labelForToc{}
+    \ifUserProvidedLabel
+        \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
+        \phantomsection
+        \label{task:\FullTaskLabel}
+        \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#3}
+        \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
+    \fi
+    \ifTaskIsDone
+		\addcontentsline{odo}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
+    \else
+	\addcontentsline{#2}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
+    \fi
+
+    % --- REVISED SUBTASK PRINTING LOGIC with Optional Marker ---
+    \par\noindent\hspace{2em}%
+    \ifTaskIsDone
+        % Logic for DONE subtasks (no background)
+        \textcolor{IconColor}{\faCheck}
+        ~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
+        \ifUserProvidedDoneDate
+            \textcolor{magenta}{\texttt{\,[DD:\TaskDoneDate]}}%
+        \fi
+        \ifUserProvidedLabel
+            \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+        \fi
+        \@printtaskmarker
+		~#3%
+    \else
+        % Logic for PENDING subtasks (with subtle background)
+        \colorbox{TaskBackground}{%
+            \begin{minipage}{\linewidth-2em-2\fboxsep}
+            \textcolor{IconColor}{\faGenderless}
+            ~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
+            \ifUserProvidedLabel
+                \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+            \fi
+            \@printtaskmarker
+            ~#3%
+            \end{minipage}%
+        }%
+    \fi
+    \par\vspace{1mm}
+    \egroup
+}
+
+% --- User-Facing Commands & Reference (Stable) ---
+\newcommand{\imp}[2][]{\@createmaintask[#1]{tdo}{TaskImp}{#2}}
+\newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}}
+\newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
+\newcommand{\backlog}[2][]{\@createmaintask[#1]{bkl}{TaskBacklog}{#2}}
+\newcommand{\subbacklog}[2][]{\@createsubtask[#1]{bkl}{#2}}
+
+\newcommand{\reftask}[1]{%
+  \ifcsdef{tasktext@#1}%
+    {\hyperref[task:#1]{\textbf{Task~\ref{task:#1}:}~\csuse{tasktext@#1}}}%
+    {\textcolor{red}{[Unknown task label '#1']}}%
+}
+
+% --- "List of..." Commands (Stable) ---
+\newcommand{\listoftodos}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
+  \chapter{List of Todos}
+  \par\noindent{\Large\textbf{Total pending tasks: \textcolor{red}{\thecounttodos}}}\par\vspace{1.5em}
+  \@starttoc{tdo}
+  \egroup
+}
+\newcommand{\listofbacklog}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
+  \chapter{List of Backlog}
+  \par\noindent{\Large\textbf{Total backlog tasks: \textcolor{red}{\thecountbacklog}}}\par\vspace{1.5em}
+  \@starttoc{bkl}
+  \egroup
+}
+\newcommand{\listofdonetodos}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDone}{##1\hfill##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTaskDone}{##1\hfill##2}\par}
+  \chapter{List of Done Tasks}
+\par\noindent{\Large\textbf{Total completed tasks: \textcolor{red}{\thecountdone}}}\par\vspace{1.5em}
+  \@starttoc{odo}
+  \egroup
+}
+\makeatother
+
+% --- Main Document ---
+\begin{document}
+
+\let\cleardoublepage\clearpage % Tufte-book specific tweak
+\input{entries.tex}
+\listoftodos
+\listofbacklog
+\listofdonetodos
+
+\end{document}
