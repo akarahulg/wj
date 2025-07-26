@@ -37,6 +37,7 @@ JOURNAL_TEX="$JOURNAL_DIR/main.tex"
 
 DATE=$(date +%Y-%m-%d)
 LABELDATE=$(date +%y%m%d)
+DAY_OF_WEEK=$(date +%a)
 FILENAME="$DATE.tex"
 FILEPATH="$ENTRIES_DIR/$FILENAME"
 
@@ -77,7 +78,7 @@ fi
 # Create the new entry file with no title generated
 cat <<EOF > "$FILEPATH"
 % !TEX root = ../main.tex
-\\section{{\\bf $DATE}}
+\\section{{\\bf $DATE - $DAY_OF_WEEK}}
 
 \\vspace{1em}\\noindent\\rule{\\linewidth}{0.4pt}
 EOF
