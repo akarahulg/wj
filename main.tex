@@ -6,7 +6,8 @@
 \usepackage{hyperref}
 \usepackage{amssymb}
 \usepackage{calc} % Needed for width calculations in minipage
-\usepackage{fontawesome5} 
+\usepackage{fontawesome5}
+\usepackage{refcount} %%% ADDED: To get the raw number from a reference
 
 % --- Global Document Setup ---
 \setcounter{tocdepth}{-1}
@@ -21,38 +22,35 @@
 \definecolor{TaskBacklog}{HTML}{153131}
 \definecolor{TaskDefault}{HTML}{333B3E}
 \definecolor{TaskActive}{HTML}{9A031E}
-\definecolor{TaskBackground}{HTML}{EFEFEF} 
+\definecolor{TaskBackground}{HTML}{EFEFEF}
 \definecolor{IconColor}{HTML}{008B00}
 \definecolor{MarkerColor}{HTML}{50723C}
+\definecolor{ActiveTaskBackground}{HTML}{E8F5E9}
 
 \hypersetup{colorlinks=true, linkcolor=teal, urlcolor=cyan}
 
+
+\newcommand{\mn}[1]{\marginnote{-- #1}}
 % --- Counters ---
 \newcounter{tasknumber}
 \newcounter{subtasknumber}[tasknumber]
 \renewcommand{\thesubtasknumber}{\thetasknumber.\arabic{subtasknumber}}
 
-%%% ADDED: Counters for list totals
 \newcounter{counttodos}
 \newcounter{countbacklog}
 \newcounter{countdone}
-%%% END ADDED
+\newcounter{countactive}
 
 \makeatletter
 
-%%% ADDED: Logic to count tasks by hooking into \addcontentsline
-% We save the original command and then create a new one that first
-% increments our counters and then calls the original.
 \let\original@addcontentsline\addcontentsline
 \renewcommand{\addcontentsline}[3]{%
-    % Check the file extension (#1) and increment the correct counter
     \ifstrequal{#1}{tdo}{\stepcounter{counttodos}}{}%
     \ifstrequal{#1}{bkl}{\stepcounter{countbacklog}}{}%
     \ifstrequal{#1}{odo}{\stepcounter{countdone}}{}%
-    % Now, execute the original command to write to the file
+    \ifstrequal{#1}{act}{\stepcounter{countactive}}{}%
     \original@addcontentsline{#1}{#2}{#3}%
 }
-%%% END ADDED
 
 
 % --- Key-Value System and Prefix Management (Stable) ---
@@ -71,14 +69,14 @@
 \newif\ifUserProvidedDoneDate
 \newif\ifUserProvidedMarker
 \def\ShortTaskLabel{}
-\def\TaskDoneDate{} 
+\def\TaskDoneDate{}
 \def\TaskMarker{}
 \def\taskcolor{}
 \define@key{task}{done}[true]{\TaskIsDonetrue}
 \define@key{task}{color}{\def\taskcolor{#1}}
 \define@key{task}{label}{\def\ShortTaskLabel{#1}\UserProvidedLabeltrue}
 \define@key{task}{donedate}{\def\TaskDoneDate{#1}\UserProvidedDoneDatetrue}
-\define@key{task}{marker}{\def\TaskMarker{#1}\UserProvidedMarkertrue} 
+\define@key{task}{marker}{\def\TaskMarker{#1}\UserProvidedMarkertrue}
 
 % --- Internal Helper to Print the Marker ---
 \newcommand{\@printtaskmarker}{%
@@ -94,10 +92,10 @@
     \TaskIsDonefalse
     \UserProvidedLabelfalse
     \UserProvidedDoneDatefalse
-    \UserProvidedMarkerfalse 
+    \UserProvidedMarkerfalse
     \def\ShortTaskLabel{}
     \def\TaskDoneDate{}
-    \def\TaskMarker{} 
+    \def\TaskMarker{}
     \def\taskcolor{#3}
     \setkeys{task}{#1}
     \refstepcounter{tasknumber}
@@ -219,7 +217,63 @@
     {\textcolor{red}{[Unknown task label '#1']}}%
 }
 
-% --- "List of..." Commands (Stable) ---
+%%% REVISED: The \activetask command with your requested changes
+\newcommand{\activetask}[2][]{%
+    \bgroup
+    % Reset done flag and process keys
+    \TaskIsDonefalse
+    \setkeys{task}{#1}%
+    % Check if the referenced task actually exists
+    \ifcsdef{tasktext@#2}{%
+        % If it exists, proceed based on the 'done' flag
+        \ifTaskIsDone
+            % --- MODIFIED: New format for completed active tasks ---
+            \par\noindent
+            \textcolor{IconColor}{\faCheck}
+            ~\textcolor{TaskDone}{\textbf{Task \ref{task:#2}:}}
+            \textcolor{TaskLabel}{\texttt{\,[#2]}}%
+            ~\csuse{tasktext@#2}%
+            \par\vspace{1mm}
+        \else
+            % If not done, this is an ACTIVE task.
+            % 1. Add it to the list of active tasks.
+            \addcontentsline{act}{section}{%
+                \protect\numberline{\bf\textcolor{magenta}{\getrefnumber{task:#2}}}% %%% REVISED: Use \getrefnumber instead of \ref
+                \protect\textcolor{TaskLabel}{\protect\texttt{\space[#2]}}%
+                \space \csuse{tasktext@#2}%
+            }%
+            % 2. Print it in the document body with special formatting.
+            \par\noindent
+            \colorbox{ActiveTaskBackground}{%
+                \begin{minipage}{\linewidth-2\fboxsep}
+                \textcolor{IconColor}{\faPlayCircle} % Use a different icon for "active"
+                ~\textcolor{TaskActive}{\textbf{Active Task \ref{task:#2}:}}%
+                \textcolor{TaskLabel}{\texttt{\,[#2]}}%
+                ~\csuse{tasktext@#2}%
+                \end{minipage}%
+            }%
+            \par\vspace{1mm}
+        \fi
+    }{%
+        % If the task label does not exist, print an error.
+        \par\noindent\textcolor{red}{[Unknown task label for \texttt{\textbackslash activetask}: '#2']}\par
+    }%
+    \egroup
+}
+%%% END REVISED
+
+
+% --- "List of..." Commands ---
+\newcommand{\listofactivetasks}{%
+  \bgroup
+  \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
+  \chapter{List of Active Tasks}
+  \par\noindent{\Large\textbf{Total active tasks: \textcolor{red}{\thecountactive}}}\par\vspace{1.5em}
+  \@starttoc{act}
+  \egroup
+}
+
 \newcommand{\listoftodos}{%
   \bgroup
   \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
@@ -254,8 +308,10 @@
 
 \let\cleardoublepage\clearpage % Tufte-book specific tweak
 \input{entries.tex}
+\listofactivetasks
 \listoftodos
 \listofbacklog
 \listofdonetodos
 
 \end{document}
+
