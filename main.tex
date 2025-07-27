@@ -7,7 +7,7 @@
 \usepackage{amssymb}
 \usepackage{calc} % Needed for width calculations in minipage
 \usepackage{fontawesome5}
-\usepackage{refcount} %%% ADDED: To get the raw number from a reference
+\usepackage{refcount} %%% To get the raw number from a reference
 
 % --- Global Document Setup ---
 \setcounter{tocdepth}{-1}
@@ -53,7 +53,7 @@
 }
 
 
-% --- Key-Value System and Prefix Management (Stable) ---
+% --- Key-Value System and Prefix Management ---
 \usepackage{keyval}
 \gdef\CurrentTaskPrefix{}
 \newcommand{\dailytasks}[2]{%
@@ -64,7 +64,10 @@
   \global\let\oldCurrentTaskPrefix\oldCurrentTaskPrefix
   \egroup
 }
+
+%%% REVISED: Added a new flag and key for the 'doing' state
 \newif\ifTaskIsDone
+\newif\ifTaskIsDoing %%% ADDED: New flag for 'doing' state
 \newif\ifUserProvidedLabel
 \newif\ifUserProvidedDoneDate
 \newif\ifUserProvidedMarker
@@ -73,6 +76,7 @@
 \def\TaskMarker{}
 \def\taskcolor{}
 \define@key{task}{done}[true]{\TaskIsDonetrue}
+\define@key{task}{doing}[true]{\TaskIsDoingtrue} %%% ADDED: New key for 'doing' state
 \define@key{task}{color}{\def\taskcolor{#1}}
 \define@key{task}{label}{\def\ShortTaskLabel{#1}\UserProvidedLabeltrue}
 \define@key{task}{donedate}{\def\TaskDoneDate{#1}\UserProvidedDoneDatetrue}
@@ -86,10 +90,13 @@
 }
 
 % --- Master Task Creation Commands (Internal) ---
+
+%%% REVISED: \@createmaintask now handles the 'doing' state
 \newcommand{\@createmaintask}[4][]{%
     \bgroup
     % Reset flags for this task
     \TaskIsDonefalse
+    \TaskIsDoingfalse %%% ADDED: Reset doing flag
     \UserProvidedLabelfalse
     \UserProvidedDoneDatefalse
     \UserProvidedMarkerfalse
@@ -100,6 +107,7 @@
     \setkeys{task}{#1}
     \refstepcounter{tasknumber}
     \def\labelForToc{}
+    % --- Handle Labels and create the ToC entry text ---
     \ifUserProvidedLabel
         \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
         \phantomsection
@@ -107,16 +115,25 @@
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#4}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
+
+    % --- REVISED LIST LOGIC ---
+    % Add the task to the appropriate list(s)
     \ifTaskIsDone
+        % If done, it only goes to the 'done' list
 		\addcontentsline{odo}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
     \else
+        % If not done, it ALWAYS goes to its primary list (todo or backlog)
 		\addcontentsline{#2}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
+        % If it's ALSO being done, add it to the 'active' list as well
+        \ifTaskIsDoing
+            \addcontentsline{act}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
+        \fi
     \fi
 
-    % --- REVISED PRINTING LOGIC with Optional Marker ---
+    % --- REVISED PRINTING LOGIC (3 states: done, doing, pending) ---
     \par\noindent
     \ifTaskIsDone
-        % Logic for DONE tasks (no background)
+        % --- State 1: DONE task ---
         \textcolor{IconColor}{\faCheck}
         ~\textcolor{TaskDone}{\textbf{\thetasknumber:}}%
         \ifUserProvidedDoneDate
@@ -128,27 +145,44 @@
         \@printtaskmarker
 		~#4%
     \else
-        % Logic for PENDING tasks (with subtle background)
-        \colorbox{TaskBackground}{%
-            \begin{minipage}{\linewidth-2\fboxsep}
-            \textcolor{IconColor}{\faGenderless}
-            ~\textcolor{\taskcolor}{\textbf{\thetasknumber:}}%
-            \ifUserProvidedLabel
-                \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-            \fi
-            \@printtaskmarker
-            ~#4%
-            \end{minipage}%
-        }%
+        \ifTaskIsDoing
+            % --- State 2: ACTIVE (DOING) task ---
+            \colorbox{ActiveTaskBackground}{%
+                \begin{minipage}{\linewidth-2\fboxsep}
+                \textcolor{IconColor}{\faPlayCircle}
+				~\textcolor{TaskActive}{\textbf{Active Task~\textcolor{TaskDefault}{\thetasknumber:}}}%
+                \ifUserProvidedLabel
+                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+                \fi
+                \@printtaskmarker
+                ~#4%
+                \end{minipage}%
+            }%
+        \else
+            % --- State 3: PENDING (default) task ---
+            \colorbox{TaskBackground}{%
+                \begin{minipage}{\linewidth-2\fboxsep}
+                \textcolor{IconColor}{\faGenderless}
+                ~\textcolor{\taskcolor}{\textbf{\thetasknumber:}}%
+                \ifUserProvidedLabel
+                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+                \fi
+                \@printtaskmarker
+                ~#4%
+                \end{minipage}%
+            }%
+        \fi
     \fi
     \par\vspace{1mm}
     \egroup
 }
 
+%%% REVISED: \@createsubtask now also handles the 'doing' state
 \newcommand{\@createsubtask}[3][]{%
     \bgroup
     % Reset flags for this task
     \TaskIsDonefalse
+    \TaskIsDoingfalse %%% ADDED: Reset doing flag
     \UserProvidedLabelfalse
     \UserProvidedDoneDatefalse
     \UserProvidedMarkerfalse
@@ -166,16 +200,21 @@
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#3}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
+
+    % --- REVISED LIST LOGIC ---
     \ifTaskIsDone
 		\addcontentsline{odo}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
     \else
-	\addcontentsline{#2}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
+	    \addcontentsline{#2}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
+        \ifTaskIsDoing
+            \addcontentsline{act}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
+        \fi
     \fi
 
-    % --- REVISED SUBTASK PRINTING LOGIC with Optional Marker ---
+    % --- REVISED SUBTASK PRINTING LOGIC (3 states) ---
     \par\noindent\hspace{2em}%
     \ifTaskIsDone
-        % Logic for DONE subtasks (no background)
+        % --- State 1: DONE subtask ---
         \textcolor{IconColor}{\faCheck}
         ~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
         \ifUserProvidedDoneDate
@@ -187,18 +226,33 @@
         \@printtaskmarker
 		~#3%
     \else
-        % Logic for PENDING subtasks (with subtle background)
-        \colorbox{TaskBackground}{%
-            \begin{minipage}{\linewidth-2em-2\fboxsep}
-            \textcolor{IconColor}{\faGenderless}
-            ~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
-            \ifUserProvidedLabel
-                \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-            \fi
-            \@printtaskmarker
-            ~#3%
-            \end{minipage}%
-        }%
+        \ifTaskIsDoing
+            % --- State 2: ACTIVE (DOING) subtask ---
+            \colorbox{ActiveTaskBackground}{%
+                \begin{minipage}{\linewidth-2em-2\fboxsep}
+                \textcolor{IconColor}{\faPlayCircle}
+				~\textcolor{TaskActive}{\textbf{Active Task~ \textcolor{TaskDefault}{\thesubtasknumber}:}}%
+                \ifUserProvidedLabel
+                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+                \fi
+                \@printtaskmarker
+                ~#3%
+                \end{minipage}%
+            }%
+        \else
+            % --- State 3: PENDING subtask ---
+            \colorbox{TaskBackground}{%
+                \begin{minipage}{\linewidth-2em-2\fboxsep}
+                \textcolor{IconColor}{\faGenderless}
+                ~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
+                \ifUserProvidedLabel
+                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
+                \fi
+                \@printtaskmarker
+                ~#3%
+                \end{minipage}%
+            }%
+        \fi
     \fi
     \par\vspace{1mm}
     \egroup
@@ -217,17 +271,23 @@
     {\textcolor{red}{[Unknown task label '#1']}}%
 }
 
-%%% REVISED: The \activetask command with your requested changes
+%%% NOTE: The \activetask command is now functionally superseded by the
+%%%       [doing] option. For example, instead of:
+%%%       \todo[label=mytask]{A task to do.}
+%%%       ... later ...
+%%%       \activetask{mytask}
+%%%
+%%%       You can now simply write:
+%%%       \todo[doing, label=mytask]{A task to do.}
+%%%
+%%%       The old command is left here for compatibility but the new
+%%%       workflow is recommended.
 \newcommand{\activetask}[2][]{%
     \bgroup
-    % Reset done flag and process keys
     \TaskIsDonefalse
     \setkeys{task}{#1}%
-    % Check if the referenced task actually exists
     \ifcsdef{tasktext@#2}{%
-        % If it exists, proceed based on the 'done' flag
         \ifTaskIsDone
-            % --- MODIFIED: New format for completed active tasks ---
             \par\noindent
             \textcolor{IconColor}{\faCheck}
             ~\textcolor{TaskDone}{\textbf{Task \ref{task:#2}:}}
@@ -235,18 +295,15 @@
             ~\csuse{tasktext@#2}%
             \par\vspace{1mm}
         \else
-            % If not done, this is an ACTIVE task.
-            % 1. Add it to the list of active tasks.
             \addcontentsline{act}{section}{%
-                \protect\numberline{\bf\textcolor{magenta}{\getrefnumber{task:#2}}}% %%% REVISED: Use \getrefnumber instead of \ref
+                \protect\numberline{\bf\textcolor{magenta}{\getrefnumber{task:#2}}}%
                 \protect\textcolor{TaskLabel}{\protect\texttt{\space[#2]}}%
                 \space \csuse{tasktext@#2}%
             }%
-            % 2. Print it in the document body with special formatting.
             \par\noindent
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
-                \textcolor{IconColor}{\faPlayCircle} % Use a different icon for "active"
+                \textcolor{IconColor}{\faPlayCircle}
                 ~\textcolor{TaskActive}{\textbf{Active Task \ref{task:#2}:}}%
                 \textcolor{TaskLabel}{\texttt{\,[#2]}}%
                 ~\csuse{tasktext@#2}%
@@ -255,12 +312,10 @@
             \par\vspace{1mm}
         \fi
     }{%
-        % If the task label does not exist, print an error.
         \par\noindent\textcolor{red}{[Unknown task label for \texttt{\textbackslash activetask}: '#2']}\par
     }%
     \egroup
 }
-%%% END REVISED
 
 
 % --- "List of..." Commands ---
@@ -273,7 +328,6 @@
   \@starttoc{act}
   \egroup
 }
-
 \newcommand{\listoftodos}{%
   \bgroup
   \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
@@ -314,4 +368,3 @@
 \listofdonetodos
 
 \end{document}
-
