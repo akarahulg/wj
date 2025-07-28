@@ -19,7 +19,6 @@
 \definecolor{TaskNote}{HTML}{5BC0DE}
 \definecolor{TaskLabel}{HTML}{777777}
 \definecolor{SubTask}{HTML}{333B3E}
-\definecolor{TaskBacklog}{HTML}{153131}
 \definecolor{TaskDefault}{HTML}{333B3E}
 \definecolor{TaskActive}{HTML}{9A031E}
 \definecolor{TaskBackground}{HTML}{EFEFEF}
@@ -37,19 +36,30 @@
 \renewcommand{\thesubtasknumber}{\thetasknumber.\arabic{subtasknumber}}
 
 \newcounter{counttodos}
-\newcounter{countbacklog}
 \newcounter{countdone}
 \newcounter{countactive}
+% --- Eisenhower counters for 'todos' ---
+\newcounter{counttodosdo}
+\newcounter{counttodosdecide}
+\newcounter{counttodosdelegate}
+\newcounter{counttodosdelete}
+\newcounter{counttodosna}
 
 \makeatletter
 
 \let\original@addcontentsline\addcontentsline
 \renewcommand{\addcontentsline}[3]{%
-    \ifstrequal{#1}{tdo}{\stepcounter{counttodos}}{}%
-    \ifstrequal{#1}{bkl}{\stepcounter{countbacklog}}{}%
-    \ifstrequal{#1}{odo}{\stepcounter{countdone}}{}%
-    \ifstrequal{#1}{act}{\stepcounter{countactive}}{}%
-    \original@addcontentsline{#1}{#2}{#3}%
+    \ifstrequal{#1}{tdo}{%
+        \stepcounter{counttodos}%
+        \edef\CurrentEisenCounterName{counttodos\TaskEisenValue}%
+        \expandafter\addtocounter\expandafter{\CurrentEisenCounterName}{1}%
+        \original@addcontentsline{tdo-\TaskEisenValue}{#2}{#3}%
+    }{%
+        % This block handles all other types (act, odo, etc.)
+        \ifstrequal{#1}{act}{\stepcounter{countactive}}{}%
+        \ifstrequal{#1}{odo}{\stepcounter{countdone}}{}%
+        \original@addcontentsline{#1}{#2}{#3}%
+    }%
 }
 
 
@@ -65,9 +75,8 @@
   \egroup
 }
 
-%%% REVISED: Added a new flag and key for the 'doing' state
 \newif\ifTaskIsDone
-\newif\ifTaskIsDoing %%% ADDED: New flag for 'doing' state
+\newif\ifTaskIsDoing
 \newif\ifUserProvidedLabel
 \newif\ifUserProvidedDoneDate
 \newif\ifUserProvidedMarker
@@ -75,12 +84,14 @@
 \def\TaskDoneDate{}
 \def\TaskMarker{}
 \def\taskcolor{}
+\def\TaskEisenValue{} 
 \define@key{task}{done}[true]{\TaskIsDonetrue}
-\define@key{task}{doing}[true]{\TaskIsDoingtrue} %%% ADDED: New key for 'doing' state
+\define@key{task}{doing}[true]{\TaskIsDoingtrue}
 \define@key{task}{color}{\def\taskcolor{#1}}
 \define@key{task}{label}{\def\ShortTaskLabel{#1}\UserProvidedLabeltrue}
 \define@key{task}{donedate}{\def\TaskDoneDate{#1}\UserProvidedDoneDatetrue}
 \define@key{task}{marker}{\def\TaskMarker{#1}\UserProvidedMarkertrue}
+\define@key{task}{eisen}{\def\TaskEisenValue{#1}}
 
 % --- Internal Helper to Print the Marker ---
 \newcommand{\@printtaskmarker}{%
@@ -91,23 +102,15 @@
 
 % --- Master Task Creation Commands (Internal) ---
 
-%%% REVISED: \@createmaintask now handles the 'doing' state
 \newcommand{\@createmaintask}[4][]{%
     \bgroup
-    % Reset flags for this task
-    \TaskIsDonefalse
-    \TaskIsDoingfalse %%% ADDED: Reset doing flag
-    \UserProvidedLabelfalse
-    \UserProvidedDoneDatefalse
-    \UserProvidedMarkerfalse
-    \def\ShortTaskLabel{}
-    \def\TaskDoneDate{}
-    \def\TaskMarker{}
+    \TaskIsDonefalse \TaskIsDoingfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse
+    \def\ShortTaskLabel{} \def\TaskDoneDate{} \def\TaskMarker{}
+    \def\TaskEisenValue{na} % Default Eisenhower value
     \def\taskcolor{#3}
     \setkeys{task}{#1}
     \refstepcounter{tasknumber}
     \def\labelForToc{}
-    % --- Handle Labels and create the ToC entry text ---
     \ifUserProvidedLabel
         \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
         \phantomsection
@@ -115,25 +118,16 @@
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#4}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
-
-    % --- REVISED LIST LOGIC ---
-    % Add the task to the appropriate list(s)
     \ifTaskIsDone
-        % If done, it only goes to the 'done' list
 		\addcontentsline{odo}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
     \else
-        % If not done, it ALWAYS goes to its primary list (todo or backlog)
 		\addcontentsline{#2}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
-        % If it's ALSO being done, add it to the 'active' list as well
         \ifTaskIsDoing
             \addcontentsline{act}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
         \fi
     \fi
-
-    % --- REVISED PRINTING LOGIC (3 states: done, doing, pending) ---
     \par\noindent
     \ifTaskIsDone
-        % --- State 1: DONE task ---
         \textcolor{IconColor}{\faCheck}
         ~\textcolor{TaskDone}{\textbf{\thetasknumber:}}%
         \ifUserProvidedDoneDate
@@ -143,10 +137,9 @@
             \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
         \fi
         \@printtaskmarker
-		~#4%
+        ~#4%
     \else
         \ifTaskIsDoing
-            % --- State 2: ACTIVE (DOING) task ---
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                 \textcolor{IconColor}{\faPlayCircle}
@@ -155,11 +148,10 @@
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
                 \fi
                 \@printtaskmarker
-                ~#4%
+                \newline#4%
                 \end{minipage}%
             }%
         \else
-            % --- State 3: PENDING (default) task ---
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                 \textcolor{IconColor}{\faGenderless}
@@ -177,18 +169,11 @@
     \egroup
 }
 
-%%% REVISED: \@createsubtask now also handles the 'doing' state
 \newcommand{\@createsubtask}[3][]{%
     \bgroup
-    % Reset flags for this task
-    \TaskIsDonefalse
-    \TaskIsDoingfalse %%% ADDED: Reset doing flag
-    \UserProvidedLabelfalse
-    \UserProvidedDoneDatefalse
-    \UserProvidedMarkerfalse
-    \def\ShortTaskLabel{}
-    \def\TaskDoneDate{}
-    \def\TaskMarker{}
+    \TaskIsDonefalse \TaskIsDoingfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse
+    \def\ShortTaskLabel{} \def\TaskDoneDate{} \def\TaskMarker{}
+    \def\TaskEisenValue{na} % Default Eisenhower value
     \def\taskcolor{SubTask}
     \setkeys{task}{#1}
     \refstepcounter{subtasknumber}
@@ -200,8 +185,6 @@
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#3}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
-
-    % --- REVISED LIST LOGIC ---
     \ifTaskIsDone
 		\addcontentsline{odo}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
     \else
@@ -210,11 +193,8 @@
             \addcontentsline{act}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
         \fi
     \fi
-
-    % --- REVISED SUBTASK PRINTING LOGIC (3 states) ---
     \par\noindent\hspace{2em}%
     \ifTaskIsDone
-        % --- State 1: DONE subtask ---
         \textcolor{IconColor}{\faCheck}
         ~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
         \ifUserProvidedDoneDate
@@ -227,7 +207,6 @@
 		~#3%
     \else
         \ifTaskIsDoing
-            % --- State 2: ACTIVE (DOING) subtask ---
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
                 \textcolor{IconColor}{\faPlayCircle}
@@ -236,11 +215,10 @@
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
                 \fi
                 \@printtaskmarker
-                ~#3%
+                \newline#3%
                 \end{minipage}%
             }%
         \else
-            % --- State 3: PENDING subtask ---
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
                 \textcolor{IconColor}{\faGenderless}
@@ -262,8 +240,6 @@
 \newcommand{\imp}[2][]{\@createmaintask[#1]{tdo}{TaskImp}{#2}}
 \newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}}
 \newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
-\newcommand{\backlog}[2][]{\@createmaintask[#1]{bkl}{TaskBacklog}{#2}}
-\newcommand{\subbacklog}[2][]{\@createsubtask[#1]{bkl}{#2}}
 
 \newcommand{\reftask}[1]{%
   \ifcsdef{tasktext@#1}%
@@ -271,17 +247,6 @@
     {\textcolor{red}{[Unknown task label '#1']}}%
 }
 
-%%% NOTE: The \activetask command is now functionally superseded by the
-%%%       [doing] option. For example, instead of:
-%%%       \todo[label=mytask]{A task to do.}
-%%%       ... later ...
-%%%       \activetask{mytask}
-%%%
-%%%       You can now simply write:
-%%%       \todo[doing, label=mytask]{A task to do.}
-%%%
-%%%       The old command is left here for compatibility but the new
-%%%       workflow is recommended.
 \newcommand{\activetask}[2][]{%
     \bgroup
     \TaskIsDonefalse
@@ -306,7 +271,7 @@
                 \textcolor{IconColor}{\faPlayCircle}
                 ~\textcolor{TaskActive}{\textbf{Active Task \ref{task:#2}:}}%
                 \textcolor{TaskLabel}{\texttt{\,[#2]}}%
-                ~\csuse{tasktext@#2}%
+                \newline\csuse{tasktext@#2}%
                 \end{minipage}%
             }%
             \par\vspace{1mm}
@@ -316,7 +281,6 @@
     }%
     \egroup
 }
-
 
 % --- "List of..." Commands ---
 \newcommand{\listofactivetasks}{%
@@ -328,30 +292,27 @@
   \@starttoc{act}
   \egroup
 }
+
 \newcommand{\listoftodos}{%
   \bgroup
   \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
   \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
   \chapter{List of Todos}
   \par\noindent{\Large\textbf{Total pending tasks: \textcolor{red}{\thecounttodos}}}\par\vspace{1.5em}
-  \@starttoc{tdo}
+  \ifnum\value{counttodosdo}>0 \subsection*{Do \normalfont\small(Urgent \& Important) - \thecounttodosdo\ task(s)} \@starttoc{tdo-do} \vspace{1em} \fi
+  \ifnum\value{counttodosdecide}>0 \subsection*{Decide \normalfont\small(Important, Not Urgent) - \thecounttodosdecide\ task(s)} \@starttoc{tdo-decide} \vspace{1em} \fi
+  \ifnum\value{counttodosdelegate}>0 \subsection*{Delegate \normalfont\small(Urgent, Not Important) - \thecounttodosdelegate\ task(s)} \@starttoc{tdo-delegate} \vspace{1em} \fi
+  \ifnum\value{counttodosdelete}>0 \subsection*{Delete \normalfont\small(Not Urgent, Not Important) - \thecounttodosdelete\ task(s)} \@starttoc{tdo-delete} \vspace{1em} \fi
+  \ifnum\value{counttodosna}>0 \subsection*{Others - \thecounttodosna\ task(s)} \@starttoc{tdo-na} \vspace{1em} \fi
   \egroup
 }
-\newcommand{\listofbacklog}{%
-  \bgroup
-  \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
-  \chapter{List of Backlog}
-  \par\noindent{\Large\textbf{Total backlog tasks: \textcolor{red}{\thecountbacklog}}}\par\vspace{1.5em}
-  \@starttoc{bkl}
-  \egroup
-}
+
 \newcommand{\listofdonetodos}{%
   \bgroup
   \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDone}{##1\hfill##2}\par}
   \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTaskDone}{##1\hfill##2}\par}
   \chapter{List of Done Tasks}
-\par\noindent{\Large\textbf{Total completed tasks: \textcolor{red}{\thecountdone}}}\par\vspace{1.5em}
+  \par\noindent{\Large\textbf{Total completed tasks: \textcolor{red}{\thecountdone}}}\par\vspace{1.5em}
   \@starttoc{odo}
   \egroup
 }
@@ -364,7 +325,6 @@
 \input{entries.tex}
 \listofactivetasks
 \listoftodos
-\listofbacklog
 \listofdonetodos
 
 \end{document}
