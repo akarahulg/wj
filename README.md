@@ -15,10 +15,12 @@ The workflow is streamlined by a companion shell script that automates the creat
 - **Structured Task Management:** Define tasks as `\todo`, important (`\imp`), or backlog items.
 - **Task Metadata:** Add rich metadata to tasks, including:
   - `done`: Mark tasks as complete.
+  - `doing`: Mark tasks as active.
   - `label`: Assign a unique, permanent label for cross-referencing.
   - `donedate`: Record the completion date.
-  - `marker`: Add custom tags or markers (e.g., `[REVIEW]`, `[API]`).
+  - `marker`: Add custom tags or markers (e.g., `[REVIEW]`, `[API]`, `\faBook`).
 - **Automatic Summary Lists:** The system automatically generates separate, hyperlinked chapters for:
+  - List of Active Tasks 
   - List of Todos (Pending Tasks)
   - List of Backlog Items
   - List of Done Tasks
@@ -94,6 +96,8 @@ These are the primary commands you will use to create tasks. They all accept the
 | `\subtodo{...}` | A sub-task nested under a `\todo`.      | List of Todos   | Dark Gray  |
 | `\backlog{...}` | A task deferred for the future.         | List of Backlog | Dark Teal  |
 | `\subbacklog{...}` | A sub-task nested under a `\backlog`. | List of Backlog | Dark Gray  |
+| `\reftask{...}` | A reference module to recall a task | NA | Blue  |
+| `\acitvetask{...}` | Mark an already planned task as active | NA | Green with play button  |
 
 ### Task Options (Key-Value Pairs)
 
@@ -123,6 +127,12 @@ You can pass options to any task creation command in square brackets `[]`.
   ```latex
   \backlog[label=db, marker=REFACTOR]{Optimize the user query.}
   ```
+
+- **activetask:** Reschedule an already defined task
+
+  ```latex
+  \activetask{<label of the task>}
+ ```
 
 ---
 
