@@ -129,7 +129,7 @@
     \par\noindent
     \ifTaskIsDone
         \textcolor{IconColor}{\faCheck}
-        ~\textcolor{TaskDone}{\textbf{\thetasknumber:}}%
+        ~\textcolor{TaskDone}{\textbf{Task \thetasknumber:}}%
         \ifUserProvidedDoneDate
             \textcolor{magenta}{\texttt{\,[DD:\TaskDoneDate]}}%
         \fi
@@ -143,7 +143,7 @@
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                 \textcolor{IconColor}{\faPlayCircle}
-				~\textcolor{TaskActive}{\textbf{Active Task~\textcolor{TaskDefault}{\thetasknumber:}}}%
+				~\textcolor{TaskActive}{\textbf{Active Task~\textcolor{TaskDefault}{Task \thetasknumber:}}}%
                 \ifUserProvidedLabel
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
                 \fi
@@ -155,7 +155,7 @@
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                 \textcolor{IconColor}{\faGenderless}
-                ~\textcolor{\taskcolor}{\textbf{\thetasknumber:}}%
+                ~\textcolor{\taskcolor}{\textbf{Task \thetasknumber:}}%
                 \ifUserProvidedLabel
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
                 \fi
