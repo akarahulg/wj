@@ -1,4 +1,9 @@
 \documentclass[anyside]{tufte-book}
+\geometry{
+  textwidth=35pc,       % Increased from default 29pc
+  marginparwidth=10pc,   % Decreased from default 10pc
+  marginparsep=1em      % Adjust separation between text and margin note
+}
 
 % --- Packages ---
 \usepackage{xcolor}
@@ -154,7 +159,7 @@
         \else
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
-                \textcolor{IconColor}{\faGenderless}
+                \textcolor{IconColor}{\faDotCircle[regular]}
                 ~\textcolor{\taskcolor}{\textbf{Task \thetasknumber:}}%
                 \ifUserProvidedLabel
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
@@ -221,7 +226,7 @@
         \else
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
-                \textcolor{IconColor}{\faGenderless}
+                \textcolor{IconColor}{\faDotCircle[regular]}
                 ~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
                 \ifUserProvidedLabel
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
@@ -243,8 +248,8 @@
 
 \newcommand{\reftask}[1]{%
   \ifcsdef{tasktext@#1}%
-    {\hyperref[task:#1]{\textbf{Task~\ref{task:#1}:}~\csuse{tasktext@#1}}}%
-    {\textcolor{red}{[Unknown task label '#1']}}%
+    {\hyperref[task:#1]{\faEdit~\textbf{Task~\ref{task:#1}:}~\csuse{tasktext@#1}}}%
+    {\textcolor{red}{[\faEdit Unknown '#1']}}%
 }
 
 \newcommand{\activetask}[2][]{%
@@ -282,11 +287,11 @@
     \egroup
 }
 
-% --- "List of..." Commands ---
 \newcommand{\listofactivetasks}{%
   \bgroup
-  \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
+  \renewcommand{\numberline}[1]{##1\quad}
+  \renewcommand*\l@section[2]{\par\noindent##1\dotfill##2\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\dotfill##2\par}
   \chapter{List of Active Tasks}
   \par\noindent{\Large\textbf{Total active tasks: \textcolor{red}{\thecountactive}}}\par\vspace{1.5em}
   \@starttoc{act}
@@ -295,8 +300,9 @@
 
 \newcommand{\listoftodos}{%
   \bgroup
-  \renewcommand*\l@section[2]{\par\noindent##1\hfill##2\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\hfill##2\par}
+  \renewcommand{\numberline}[1]{##1\quad}
+  \renewcommand*\l@section[2]{\par\noindent##1\dotfill##2\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\dotfill##2\par}
   \chapter{List of Todos}
   \par\noindent{\Large\textbf{Total pending tasks: \textcolor{red}{\thecounttodos}}}\par\vspace{1.5em}
   \ifnum\value{counttodosdo}>0 \subsection*{Do \normalfont\small(Urgent \& Important) - \thecounttodosdo\ task(s)} \@starttoc{tdo-do} \vspace{1em} \fi
@@ -309,14 +315,16 @@
 
 \newcommand{\listofdonetodos}{%
   \bgroup
-  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDone}{##1\hfill##2}\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTaskDone}{##1\hfill##2}\par}
+  \renewcommand{\numberline}[1]{##1\quad}
+  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDone}{##1\dotfill##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTaskDone}{##1\dotfill##2}\par}
   \chapter{List of Done Tasks}
   \par\noindent{\Large\textbf{Total completed tasks: \textcolor{red}{\thecountdone}}}\par\vspace{1.5em}
   \@starttoc{odo}
   \egroup
 }
 \makeatother
+
 
 % --- Main Document ---
 \begin{document}
