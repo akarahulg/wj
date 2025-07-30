@@ -13,6 +13,7 @@
 \usepackage{calc} % Needed for width calculations in minipage
 \usepackage{fontawesome5}
 \usepackage{refcount} %%% To get the raw number from a reference
+\usepackage{enumitem} % should already be loaded if you're customizing TOC
 
 % --- Global Document Setup ---
 \setcounter{tocdepth}{-1}
@@ -133,11 +134,13 @@
     \fi
     \par\noindent
     \ifTaskIsDone
+        % *** MODIFIED BLOCK ***
+        % Place the 'donedate' in a margin note if it exists
+        \ifUserProvidedDoneDate
+            \marginnote{\textcolor{IconColor}{\faCalendarCheck[regular]}~\textcolor{magenta}{\bf \TaskDoneDate}}%
+        \fi
         \textcolor{IconColor}{\faCheck}
         ~\textcolor{TaskDone}{\textbf{Task \thetasknumber:}}%
-        \ifUserProvidedDoneDate
-            \textcolor{magenta}{\texttt{\,[DD:\TaskDoneDate]}}%
-        \fi
         \ifUserProvidedLabel
             \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
         \fi
@@ -148,7 +151,7 @@
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                 \textcolor{IconColor}{\faPlayCircle}
-				~\textcolor{TaskActive}{\textbf{Active Task~\textcolor{TaskDefault}{Task \thetasknumber:}}}%
+				~\textcolor{TaskActive}{\textbf{Active ~\textcolor{TaskDefault}{Task \thetasknumber:}}}%
                 \ifUserProvidedLabel
                     \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
                 \fi
@@ -200,11 +203,13 @@
     \fi
     \par\noindent\hspace{2em}%
     \ifTaskIsDone
+        % *** MODIFIED BLOCK ***
+        % Place the 'donedate' in a margin note if it exists
+        \ifUserProvidedDoneDate
+            \marginnote{\textcolor{IconColor}{\faCalendarCheck[regular]}~\textcolor{magenta}{\bf \TaskDoneDate}}%
+        \fi
         \textcolor{IconColor}{\faCheck}
         ~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
-        \ifUserProvidedDoneDate
-            \textcolor{magenta}{\texttt{\,[DD:\TaskDoneDate]}}%
-        \fi
         \ifUserProvidedLabel
             \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
         \fi
@@ -274,7 +279,7 @@
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                 \textcolor{IconColor}{\faPlayCircle}
-                ~\textcolor{TaskActive}{\textbf{Active Task \ref{task:#2}:}}%
+                ~\textcolor{TaskActive}{\textbf{Active \ref{task:#2}:}}%
                 \textcolor{TaskLabel}{\texttt{\,[#2]}}%
                 \newline\csuse{tasktext@#2}%
                 \end{minipage}%
@@ -290,8 +295,8 @@
 \newcommand{\listofactivetasks}{%
   \bgroup
   \renewcommand{\numberline}[1]{##1\quad}
-  \renewcommand*\l@section[2]{\par\noindent##1\dotfill##2\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\dotfill##2\par}
+  \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
   \chapter{List of Active Tasks}
   \par\noindent{\Large\textbf{Total active tasks: \textcolor{red}{\thecountactive}}}\par\vspace{1.5em}
   \@starttoc{act}
@@ -301,8 +306,8 @@
 \newcommand{\listoftodos}{%
   \bgroup
   \renewcommand{\numberline}[1]{##1\quad}
-  \renewcommand*\l@section[2]{\par\noindent##1\dotfill##2\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}##1\dotfill##2\par}
+  \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
   \chapter{List of Todos}
   \par\noindent{\Large\textbf{Total pending tasks: \textcolor{red}{\thecounttodos}}}\par\vspace{1.5em}
   \ifnum\value{counttodosdo}>0 \subsection*{Do \normalfont\small(Urgent \& Important) - \thecounttodosdo\ task(s)} \@starttoc{tdo-do} \vspace{1em} \fi
@@ -316,8 +321,8 @@
 \newcommand{\listofdonetodos}{%
   \bgroup
   \renewcommand{\numberline}[1]{##1\quad}
-  \renewcommand*\l@section[2]{\par\noindent\textcolor{TaskDone}{##1\dotfill##2}\par}
-  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\textcolor{SubTaskDone}{##1\dotfill##2}\par}
+  \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1\textcolor{TaskDone}{##1\dotfill##2}\par}
+  \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\hangindent=3em\hangafter=1\textcolor{SubTaskDone}{##1\dotfill##2}\par}
   \chapter{List of Done Tasks}
   \par\noindent{\Large\textbf{Total completed tasks: \textcolor{red}{\thecountdone}}}\par\vspace{1.5em}
   \@starttoc{odo}
