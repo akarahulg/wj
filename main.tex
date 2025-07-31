@@ -53,6 +53,14 @@
 
 \makeatletter
 
+% --- ROBUST .AUX FILE MECHANISM ---
+\newcommand{\@settaskdonestatus}[2]{%
+  \csgdef{task@#1@isdone}{true}%
+  \csgdef{task@#1@donedate}{#2}%
+}
+% --- END MECHANISM ---
+
+
 \let\original@addcontentsline\addcontentsline
 \renewcommand{\addcontentsline}[3]{%
     \ifstrequal{#1}{tdo}{%
@@ -61,7 +69,6 @@
         \expandafter\addtocounter\expandafter{\CurrentEisenCounterName}{1}%
         \original@addcontentsline{tdo-\TaskEisenValue}{#2}{#3}%
     }{%
-        % This block handles all other types (act, odo, etc.)
         \ifstrequal{#1}{act}{\stepcounter{countactive}}{}%
         \ifstrequal{#1}{odo}{\stepcounter{countdone}}{}%
         \original@addcontentsline{#1}{#2}{#3}%
@@ -72,14 +79,19 @@
 % --- Key-Value System and Prefix Management ---
 \usepackage{keyval}
 \gdef\CurrentTaskPrefix{}
+\gdef\CurrentDailyDate{} 
+
 \newcommand{\dailytasks}[2]{%
   \bgroup
   \let\oldCurrentTaskPrefix\CurrentTaskPrefix
   \gdef\CurrentTaskPrefix{#1-}%
+  \gdef\CurrentDailyDate{#1}% 
   \input{#2}%
+  \gdef\CurrentDailyDate{}%
   \global\let\oldCurrentTaskPrefix\oldCurrentTaskPrefix
   \egroup
 }
+
 
 \newif\ifTaskIsDone
 \newif\ifTaskIsDoing
@@ -99,31 +111,38 @@
 \define@key{task}{marker}{\def\TaskMarker{#1}\UserProvidedMarkertrue}
 \define@key{task}{eisen}{\def\TaskEisenValue{#1}}
 
-% --- Internal Helper to Print the Marker ---
 \newcommand{\@printtaskmarker}{%
     \ifUserProvidedMarker
         \textcolor{MarkerColor}{\texttt{\,~\TaskMarker~}}%
     \fi
 }
 
-% --- Master Task Creation Commands (Internal) ---
-
 \newcommand{\@createmaintask}[4][]{%
     \bgroup
     \TaskIsDonefalse \TaskIsDoingfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse
     \def\ShortTaskLabel{} \def\TaskDoneDate{} \def\TaskMarker{}
-    \def\TaskEisenValue{na} % Default Eisenhower value
+    \def\TaskEisenValue{na}
     \def\taskcolor{#3}
     \setkeys{task}{#1}
     \refstepcounter{tasknumber}
     \def\labelForToc{}
     \ifUserProvidedLabel
         \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
+        
+        \ifcsdef{task@\FullTaskLabel @isdone}{%
+            \TaskIsDonetrue 
+            \ifcsdef{task@\FullTaskLabel @donedate}{%
+                \edef\TaskDoneDate{\csuse{task@\FullTaskLabel @donedate}}
+                \UserProvidedDoneDatetrue
+            }{}%
+        }{}%
+
         \phantomsection
         \label{task:\FullTaskLabel}
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#4}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
+    
     \ifTaskIsDone
 		\addcontentsline{odo}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
     \else
@@ -132,10 +151,9 @@
             \addcontentsline{act}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
         \fi
     \fi
+
     \par\noindent
     \ifTaskIsDone
-        % *** MODIFIED BLOCK ***
-        % Place the 'donedate' in a margin note if it exists
         \ifUserProvidedDoneDate
             \marginnote{\textcolor{IconColor}{\faCalendarCheck[regular]}~\textcolor{magenta}{\bf \TaskDoneDate}}%
         \fi
@@ -181,13 +199,20 @@
     \bgroup
     \TaskIsDonefalse \TaskIsDoingfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse
     \def\ShortTaskLabel{} \def\TaskDoneDate{} \def\TaskMarker{}
-    \def\TaskEisenValue{na} % Default Eisenhower value
+    \def\TaskEisenValue{na}
     \def\taskcolor{SubTask}
     \setkeys{task}{#1}
     \refstepcounter{subtasknumber}
     \def\labelForToc{}
     \ifUserProvidedLabel
         \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
+        \ifcsdef{task@\FullTaskLabel @isdone}{%
+            \TaskIsDonetrue
+            \ifcsdef{task@\FullTaskLabel @donedate}{%
+                \edef\TaskDoneDate{\csuse{task@\FullTaskLabel @donedate}}
+                \UserProvidedDoneDatetrue
+            }{}%
+        }{}%
         \phantomsection
         \label{task:\FullTaskLabel}
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#3}
@@ -203,8 +228,6 @@
     \fi
     \par\noindent\hspace{2em}%
     \ifTaskIsDone
-        % *** MODIFIED BLOCK ***
-        % Place the 'donedate' in a margin note if it exists
         \ifUserProvidedDoneDate
             \marginnote{\textcolor{IconColor}{\faCalendarCheck[regular]}~\textcolor{magenta}{\bf \TaskDoneDate}}%
         \fi
@@ -246,7 +269,6 @@
     \egroup
 }
 
-% --- User-Facing Commands & Reference (Stable) ---
 \newcommand{\imp}[2][]{\@createmaintask[#1]{tdo}{TaskImp}{#2}}
 \newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}}
 \newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
@@ -263,12 +285,26 @@
     \setkeys{task}{#1}%
     \ifcsdef{tasktext@#2}{%
         \ifTaskIsDone
+            \ifx\CurrentDailyDate\empty
+                \PackageWarning{MyTasks}{activetask[done] used outside a dailytasks environment. Cannot set date automatically.}%
+            \else
+                \protected@write\@auxout{}{%
+                  \string\@settaskdonestatus{\unexpanded{#2}}{\CurrentDailyDate}%
+                }%
+            \fi
+            % --- MODIFIED BLOCK TO INCLUDE HYPERLINK ---
             \par\noindent
-            \textcolor{IconColor}{\faCheck}
-            ~\textcolor{TaskDone}{\textbf{Task \ref{task:#2}:}}
-            \textcolor{TaskLabel}{\texttt{\,[#2]}}%
-            ~\csuse{tasktext@#2}%
-            \par\vspace{1mm}
+            \textcolor{IconColor}{\faCalendarCheck[regular]}%
+            ~{%
+                \hypersetup{linkcolor=TaskDone}% Set the link color to our "done" blue
+                \hyperref[task:#2]{%
+                    \textbf{Task \getrefnumber{task:#2}:}%
+                    \textcolor{TaskLabel}{\texttt{\,[#2]}}%
+					~\textcolor{black}{\csuse{tasktext@#2}}%
+                }%
+            }%
+            \par\vspace{1mm}%
+            % --- END MODIFIED BLOCK ---
         \else
             \addcontentsline{act}{section}{%
                 \protect\numberline{\bf\textcolor{magenta}{\getrefnumber{task:#2}}}%
@@ -333,6 +369,9 @@
 
 % --- Main Document ---
 \begin{document}
+
+\title{Work Journal}
+\author{RG}
 
 \let\cleardoublepage\clearpage % Tufte-book specific tweak
 \input{entries.tex}
