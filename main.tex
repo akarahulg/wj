@@ -14,6 +14,7 @@
 \usepackage{fontawesome5}
 \usepackage{refcount} %%% To get the raw number from a reference
 \usepackage{enumitem} % should already be loaded if you're customizing TOC
+\usepackage{keyval}
 
 % --- Global Document Setup ---
 \setcounter{tocdepth}{-1}
@@ -31,11 +32,28 @@
 \definecolor{IconColor}{HTML}{008B00}
 \definecolor{MarkerColor}{HTML}{50723C}
 \definecolor{ActiveTaskBackground}{HTML}{E8F5E9}
+\definecolor{MeetingColor}{HTML}{6002EE}
+\definecolor{MeetingBackground}{HTML}{F3E5F5}
+\definecolor{MeetingHeld}{HTML}{388E3C}
+\definecolor{MeetingCancelled}{HTML}{D32F2F}
+\definecolor{MeetingUpcoming}{HTML}{F57C00}
+
 
 \hypersetup{colorlinks=true, linkcolor=teal, urlcolor=cyan}
 
-
 \newcommand{\mn}[1]{\marginnote{-- #1}}
+
+% --- Quick Navigation ---
+\newcommand{\quicknav}{%
+  \noindent
+  \textcolor{gray}{\footnotesize
+    \hyperref[todolist]{\faList~\bf Todos} \quad
+    \hyperref[activetasklist]{\faPlayCircle~\bf Active} \quad
+    \hyperref[donetasklist]{\faCheckSquare~\bf Done} \quad
+    \hyperref[meetinglist]{\faUsers~\bf Meetings}
+  }\par
+}
+
 % --- Counters ---
 \newcounter{tasknumber}
 \newcounter{subtasknumber}[tasknumber]
@@ -44,23 +62,29 @@
 \newcounter{counttodos}
 \newcounter{countdone}
 \newcounter{countactive}
-% --- Eisenhower counters for 'todos' ---
 \newcounter{counttodosdo}
 \newcounter{counttodosdecide}
 \newcounter{counttodosdelegate}
 \newcounter{counttodosdelete}
 \newcounter{counttodosna}
 
+\newcounter{meetingnumber}
+\newcounter{countmeetings}
+\newcounter{countmeetingsheld}
+\newcounter{countmeetingsupcoming}
+\newcounter{countmeetingscancelled}
+\newcounter{countmeetingsna}
+
+
 \makeatletter
 
-% --- ROBUST .AUX FILE MECHANISM ---
+% --- Task Done Status ---
 \newcommand{\@settaskdonestatus}[2]{%
   \csgdef{task@#1@isdone}{true}%
   \csgdef{task@#1@donedate}{#2}%
 }
-% --- END MECHANISM ---
 
-
+% --- \addcontentsline wrapper ---
 \let\original@addcontentsline\addcontentsline
 \renewcommand{\addcontentsline}[3]{%
     \ifstrequal{#1}{tdo}{%
@@ -69,15 +93,19 @@
         \expandafter\addtocounter\expandafter{\CurrentEisenCounterName}{1}%
         \original@addcontentsline{tdo-\TaskEisenValue}{#2}{#3}%
     }{%
+    \ifstrequal{#1}{mtg}{%
+        \stepcounter{countmeetings}%
+        \edef\CurrentMeetingCounterName{countmeetings\MeetingStatusValue}%
+        \expandafter\addtocounter\expandafter{\CurrentMeetingCounterName}{1}%
+        \original@addcontentsline{mtg-\MeetingStatusValue}{#2}{#3}%
+    }{%
         \ifstrequal{#1}{act}{\stepcounter{countactive}}{}%
         \ifstrequal{#1}{odo}{\stepcounter{countdone}}{}%
         \original@addcontentsline{#1}{#2}{#3}%
-    }%
+    }}%
 }
 
-
-% --- Key-Value System and Prefix Management ---
-\usepackage{keyval}
+% --- Daily Tasks Environment ---
 \gdef\CurrentTaskPrefix{}
 \gdef\CurrentDailyDate{} 
 
@@ -86,23 +114,16 @@
   \let\oldCurrentTaskPrefix\CurrentTaskPrefix
   \gdef\CurrentTaskPrefix{#1-}%
   \gdef\CurrentDailyDate{#1}% 
+  \quicknav
   \input{#2}%
   \gdef\CurrentDailyDate{}%
   \global\let\oldCurrentTaskPrefix\oldCurrentTaskPrefix
   \egroup
 }
 
-
-\newif\ifTaskIsDone
-\newif\ifTaskIsDoing
-\newif\ifUserProvidedLabel
-\newif\ifUserProvidedDoneDate
-\newif\ifUserProvidedMarker
-\def\ShortTaskLabel{}
-\def\TaskDoneDate{}
-\def\TaskMarker{}
-\def\taskcolor{}
-\def\TaskEisenValue{} 
+% --- Key-Value Setups ---
+\newif\ifTaskIsDone \newif\ifTaskIsDoing \newif\ifUserProvidedLabel \newif\ifUserProvidedDoneDate \newif\ifUserProvidedMarker
+\def\ShortTaskLabel{} \def\TaskDoneDate{} \def\TaskMarker{} \def\taskcolor{} \def\TaskEisenValue{} 
 \define@key{task}{done}[true]{\TaskIsDonetrue}
 \define@key{task}{doing}[true]{\TaskIsDoingtrue}
 \define@key{task}{color}{\def\taskcolor{#1}}
@@ -111,6 +132,18 @@
 \define@key{task}{marker}{\def\TaskMarker{#1}\UserProvidedMarkertrue}
 \define@key{task}{eisen}{\def\TaskEisenValue{#1}}
 
+\newif\ifMeetingHasLabel \newif\ifMeetingHasDate \newif\ifMeetingHasTime \newif\ifMeetingHasLocation \newif\ifMeetingHasOrganizer \newif\ifMeetingHasAttendees
+\def\MeetingLabel{} \def\MeetingDate{} \def\MeetingTime{} \def\MeetingLocation{} \def\MeetingOrganizer{} \def\MeetingAttendees{} \def\MeetingStatusValue{}
+\define@key{meeting}{label}{\def\MeetingLabel{#1}\MeetingHasLabeltrue}
+\define@key{meeting}{date}{\def\MeetingDate{#1}\MeetingHasDatetrue}
+\define@key{meeting}{time}{\def\MeetingTime{#1}\MeetingHasTimetrue}
+\define@key{meeting}{location}{\def\MeetingLocation{#1}\MeetingHasLocationtrue}
+\define@key{meeting}{organizer}{\def\MeetingOrganizer{#1}\MeetingHasOrganizertrue}
+\define@key{meeting}{attendees}{\def\MeetingAttendees{#1}\MeetingHasAttendeestrue}
+\define@key{meeting}{status}{\def\MeetingStatusValue{#1}}
+
+
+% --- Task Creation Internals ---
 \newcommand{\@printtaskmarker}{%
     \ifUserProvidedMarker
         \textcolor{MarkerColor}{\texttt{\,~\TaskMarker~}}%
@@ -128,65 +161,40 @@
     \def\labelForToc{}
     \ifUserProvidedLabel
         \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
-        
-        \ifcsdef{task@\FullTaskLabel @isdone}{%
-            \TaskIsDonetrue 
-            \ifcsdef{task@\FullTaskLabel @donedate}{%
-                \edef\TaskDoneDate{\csuse{task@\FullTaskLabel @donedate}}
-                \UserProvidedDoneDatetrue
-            }{}%
-        }{}%
-
-        \phantomsection
-        \label{task:\FullTaskLabel}
+        \ifcsdef{task@\FullTaskLabel @isdone}{\TaskIsDonetrue \ifcsdef{task@\FullTaskLabel @donedate}{\edef\TaskDoneDate{\csuse{task@\FullTaskLabel @donedate}}\UserProvidedDoneDatetrue}{}}{}%
+        \phantomsection\label{task:\FullTaskLabel}
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#4}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
-    
+    \def\markerForToc{}
+    \ifUserProvidedMarker\def\markerForToc{\protect\textcolor{MarkerColor}{\protect\texttt{\protect\,~\TaskMarker~\protect}}\space}\fi
     \ifTaskIsDone
-		\addcontentsline{odo}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
+		\addcontentsline{odo}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space\markerForToc#4}
     \else
-		\addcontentsline{#2}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
-        \ifTaskIsDoing
-            \addcontentsline{act}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space #4}
-        \fi
+		\addcontentsline{#2}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space\markerForToc#4}
+        \ifTaskIsDoing\addcontentsline{act}{section}{\protect\numberline{\bf\textcolor{magenta}{\thetasknumber}}\labelForToc\space\markerForToc#4}\fi
     \fi
-
     \par\noindent
     \ifTaskIsDone
-        \ifUserProvidedDoneDate
-            \marginnote{\textcolor{IconColor}{\faCalendarCheck[regular]}~\textcolor{magenta}{\bf \TaskDoneDate}}%
-        \fi
-        \textcolor{IconColor}{\faCheck}
-        ~\textcolor{TaskDone}{\textbf{Task \thetasknumber:}}%
-        \ifUserProvidedLabel
-            \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-        \fi
-        \@printtaskmarker
-        ~#4%
+        \ifUserProvidedDoneDate\marginnote{\textcolor{IconColor}{\faCalendarCheck}~\textcolor{magenta}{\bf \TaskDoneDate}}\fi
+        \textcolor{IconColor}{\faCheck} ~\textcolor{TaskDone}{\textbf{Task \thetasknumber:}}%
+        \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
+        \@printtaskmarker ~#4%
     \else
         \ifTaskIsDoing
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
-                \textcolor{IconColor}{\faPlayCircle}
-				~\textcolor{TaskActive}{\textbf{Active ~\textcolor{TaskDefault}{Task \thetasknumber:}}}%
-                \ifUserProvidedLabel
-                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-                \fi
-                \@printtaskmarker
-                \newline#4%
+                    \textcolor{IconColor}{\faPlayCircle}~\textcolor{TaskActive}{\textbf{Active ~\textcolor{TaskDefault}{Task \thetasknumber:}}}%
+                    \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
+                    \@printtaskmarker \newline#4%
                 \end{minipage}%
             }%
         \else
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
-                \textcolor{IconColor}{\faDotCircle[regular]}
-                ~\textcolor{\taskcolor}{\textbf{Task \thetasknumber:}}%
-                \ifUserProvidedLabel
-                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-                \fi
-                \@printtaskmarker
-                ~#4%
+                    \textcolor{IconColor}{\faDotCircle}~\textcolor{\taskcolor}{\textbf{Task \thetasknumber:}}%
+                    \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
+                    \@printtaskmarker ~#4%
                 \end{minipage}%
             }%
         \fi
@@ -199,68 +207,46 @@
     \bgroup
     \TaskIsDonefalse \TaskIsDoingfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse
     \def\ShortTaskLabel{} \def\TaskDoneDate{} \def\TaskMarker{}
-    \def\TaskEisenValue{na}
-    \def\taskcolor{SubTask}
+    \def\TaskEisenValue{na} \def\taskcolor{SubTask}
     \setkeys{task}{#1}
     \refstepcounter{subtasknumber}
     \def\labelForToc{}
     \ifUserProvidedLabel
         \xdef\FullTaskLabel{\CurrentTaskPrefix\ShortTaskLabel}%
-        \ifcsdef{task@\FullTaskLabel @isdone}{%
-            \TaskIsDonetrue
-            \ifcsdef{task@\FullTaskLabel @donedate}{%
-                \edef\TaskDoneDate{\csuse{task@\FullTaskLabel @donedate}}
-                \UserProvidedDoneDatetrue
-            }{}%
-        }{}%
-        \phantomsection
-        \label{task:\FullTaskLabel}
+        \ifcsdef{task@\FullTaskLabel @isdone}{\TaskIsDonetrue \ifcsdef{task@\FullTaskLabel @donedate}{\edef\TaskDoneDate{\csuse{task@\FullTaskLabel @donedate}}\UserProvidedDoneDatetrue}{}}{}%
+        \phantomsection \label{task:\FullTaskLabel}
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#3}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
     \fi
+    \def\markerForToc{}
+    \ifUserProvidedMarker\def\markerForToc{\protect\textcolor{MarkerColor}{\protect\texttt{\protect\,~\TaskMarker~\protect}}\space}\fi
     \ifTaskIsDone
-		\addcontentsline{odo}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
+		\addcontentsline{odo}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space\markerForToc#3}
     \else
-	    \addcontentsline{#2}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
-        \ifTaskIsDoing
-            \addcontentsline{act}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space #3}
-        \fi
+	    \addcontentsline{#2}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space\markerForToc#3}
+        \ifTaskIsDoing\addcontentsline{act}{subsection}{\protect\numberline{\bf\textcolor{magenta}{\thesubtasknumber}}\labelForToc\space\markerForToc#3}\fi
     \fi
     \par\noindent\hspace{2em}%
     \ifTaskIsDone
-        \ifUserProvidedDoneDate
-            \marginnote{\textcolor{IconColor}{\faCalendarCheck[regular]}~\textcolor{magenta}{\bf \TaskDoneDate}}%
-        \fi
-        \textcolor{IconColor}{\faCheck}
-        ~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
-        \ifUserProvidedLabel
-            \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-        \fi
-        \@printtaskmarker
-		~#3%
+        \ifUserProvidedDoneDate\marginnote{\textcolor{IconColor}{\faCalendarCheck}~\textcolor{magenta}{\bf \TaskDoneDate}}\fi
+        \textcolor{IconColor}{\faCheck}~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
+        \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
+        \@printtaskmarker ~#3%
     \else
         \ifTaskIsDoing
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
-                \textcolor{IconColor}{\faPlayCircle}
-				~\textcolor{TaskActive}{\textbf{Active Task~ \textcolor{TaskDefault}{\thesubtasknumber}:}}%
-                \ifUserProvidedLabel
-                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-                \fi
-                \@printtaskmarker
-                \newline#3%
+                    \textcolor{IconColor}{\faPlayCircle}~\textcolor{TaskActive}{\textbf{Active Task~ \textcolor{TaskDefault}{\thesubtasknumber}:}}%
+                    \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
+                    \@printtaskmarker \newline#3%
                 \end{minipage}%
             }%
         \else
             \colorbox{TaskBackground}{%
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
-                \textcolor{IconColor}{\faDotCircle[regular]}
-                ~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
-                \ifUserProvidedLabel
-                    \textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}%
-                \fi
-                \@printtaskmarker
-                ~#3%
+                    \textcolor{IconColor}{\faDotCircle}~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
+                    \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
+                    \@printtaskmarker ~#3%
                 \end{minipage}%
             }%
         \fi
@@ -269,71 +255,114 @@
     \egroup
 }
 
+% --- Public Task Commands ---
 \newcommand{\imp}[2][]{\@createmaintask[#1]{tdo}{TaskImp}{#2}}
 \newcommand{\todo}[2][]{\@createmaintask[#1]{tdo}{TaskDefault}{#2}}
 \newcommand{\subtodo}[2][]{\@createsubtask[#1]{tdo}{#2}}
 
-\newcommand{\reftask}[1]{%
-  \ifcsdef{tasktext@#1}%
-    {\hyperref[task:#1]{\faEdit~\textbf{Task~\ref{task:#1}:}~\csuse{tasktext@#1}}}%
-    {\textcolor{red}{[\faEdit Unknown '#1']}}%
-}
-
-\newcommand{\activetask}[2][]{%
+% --- Meeting Command ---
+\newcommand{\meeting}[3][]{%
     \bgroup
-    \TaskIsDonefalse
-    \setkeys{task}{#1}%
-    \ifcsdef{tasktext@#2}{%
-        \ifTaskIsDone
-            \ifx\CurrentDailyDate\empty
-                \PackageWarning{MyTasks}{activetask[done] used outside a dailytasks environment. Cannot set date automatically.}%
-            \else
-                \protected@write\@auxout{}{%
-                  \string\@settaskdonestatus{\unexpanded{#2}}{\CurrentDailyDate}%
-                }%
-            \fi
-            % --- MODIFIED BLOCK TO INCLUDE HYPERLINK ---
-            \par\noindent
-            \textcolor{IconColor}{\faCalendarCheck[regular]}%
-            ~{%
-                \hypersetup{linkcolor=TaskDone}% Set the link color to our "done" blue
-                \hyperref[task:#2]{%
-                    \textbf{Task \getrefnumber{task:#2}:}%
-                    \textcolor{TaskLabel}{\texttt{\,[#2]}}%
-					~\textcolor{black}{\csuse{tasktext@#2}}%
-                }%
-            }%
-            \par\vspace{1mm}%
-            % --- END MODIFIED BLOCK ---
-        \else
-            \addcontentsline{act}{section}{%
-                \protect\numberline{\bf\textcolor{magenta}{\getrefnumber{task:#2}}}%
-                \protect\textcolor{TaskLabel}{\protect\texttt{\space[#2]}}%
-                \space \csuse{tasktext@#2}%
-            }%
-            \par\noindent
-            \colorbox{ActiveTaskBackground}{%
-                \begin{minipage}{\linewidth-2\fboxsep}
-                \textcolor{IconColor}{\faPlayCircle}
-                ~\textcolor{TaskActive}{\textbf{Active \ref{task:#2}:}}%
-                \textcolor{TaskLabel}{\texttt{\,[#2]}}%
-                \newline\csuse{tasktext@#2}%
-                \end{minipage}%
-            }%
-            \par\vspace{1mm}
-        \fi
-    }{%
-        \par\noindent\textcolor{red}{[Unknown task label for \texttt{\textbackslash activetask}: '#2']}\par
-    }%
+    % Reset flags and macros for all optional parameters
+    % THE FIX IS HERE: \MeetingHasAttendeestrue is changed to \MeetingHasAttendeesfalse
+    \MeetingHasLabelfalse \MeetingHasDatefalse \MeetingHasTimefalse \MeetingHasLocationfalse \MeetingHasOrganizerfalse \MeetingHasAttendeesfalse
+    \def\MeetingLabel{} \def\MeetingDate{} \def\MeetingTime{} \def\MeetingLocation{} \def\MeetingOrganizer{} \def\MeetingAttendees{} \def\MeetingStatusValue{na}
+    
+    % Process all key-value pairs from argument #1
+    \setkeys{meeting}{#1}%
+    
+    % Check if 'date' and 'time' were provided. If not, set a default warning message.
+    \ifstrempty{\MeetingDate}{\def\MeetingDate{\textcolor{red}{\bf[No Date]}}}{}
+    \ifstrempty{\MeetingTime}{\def\MeetingTime{\textcolor{red}{\bf[No Time]}}}{}
+    
+    \refstepcounter{meetingnumber}%
+    
+    % Store title for cross-referencing if a label is provided
+    \ifMeetingHasLabel\phantomsection\label{meeting:\MeetingLabel}\expandafter\gdef\csname meetingtitle@\MeetingLabel\endcsname{#2}\fi
+    
+    % Set up status color and text
+    \def\statuscolor{MeetingColor}\def\statustext{}%
+    \ifstrequal{\MeetingStatusValue}{held}{\def\statuscolor{MeetingHeld}\def\statustext{\textbf{[Held] }}}{}%
+    \ifstrequal{\MeetingStatusValue}{upcoming}{\def\statuscolor{MeetingUpcoming}\def\statustext{\textbf{[Upcoming] }}}{}%
+    \ifstrequal{\MeetingStatusValue}{cancelled}{\def\statuscolor{MeetingCancelled}\def\statustext{\textbf{[Cancelled] }}}{}%
+    
+    % Add entry to the List of Meetings
+    \addcontentsline{mtg}{section}{\protect\numberline{\bf\textcolor{magenta}{\themeetingnumber}}\ifMeetingHasLabel\protect\textcolor{TaskLabel}{\protect\texttt{\space[\MeetingLabel]}}\fi\space #2 (\MeetingDate)}
+    
+    \par\noindent
+    \colorbox{MeetingBackground}{%
+    \begin{minipage}{\linewidth-2\fboxsep}
+        \textcolor{\statuscolor}{\faUsers}~%
+        \textcolor{MeetingColor}{\textbf{Meeting \themeetingnumber:}}~%
+        \textcolor{\statuscolor}{\statustext\textbf{#2}}%
+        \ifMeetingHasLabel\textcolor{TaskLabel}{\texttt{\,[\MeetingLabel]}}\fi%
+        \par\vspace{2mm}
+        % Print metadata. Date and Time will show warning if not provided.
+        \hangindent=2.5em\noindent\textbf{Date:} \MeetingDate -- \MeetingTime\par
+        % These will now only print if the key is provided
+        \ifMeetingHasLocation\hangindent=2.5em\noindent\textbf{Location:} \MeetingLocation\par\fi
+        \ifMeetingHasOrganizer\hangindent=2.5em\noindent\textbf{Organizer:} \MeetingOrganizer\par\fi
+        \ifMeetingHasAttendees\hangindent=2.5em\noindent\textbf{Attendees:} \MeetingAttendees\par\fi
+        % Add a small space before the content if content exists
+        \ifstrempty{#3}{}{\par\vspace{1.5mm}} 
+        % Handle nested tasks
+        \let\oldCurrentTaskPrefix\CurrentTaskPrefix
+        \ifMeetingHasLabel\gdef\CurrentTaskPrefix{\CurrentDailyDate-M-\MeetingLabel-}\else\gdef\CurrentTaskPrefix{\CurrentDailyDate-M\themeetingnumber-}\fi
+        #3 % This is the meeting content
+        \global\let\CurrentTaskPrefix\oldCurrentTaskPrefix
+    \end{minipage}}%
+    \par\vspace{2mm}
     \egroup
 }
 
+
+% --- Cross-referencing Commands ---
+\newcommand{\reftask}[1]{%
+  \ifcsdef{tasktext@#1}%
+    {\hyperref[task:#1]{\textbf{Task~\ref{task:#1}:}~\csuse{tasktext@#1}}}%
+    {\textcolor{red}{[Unknown task '#1']}}%
+}
+\newcommand{\refmeeting}[1]{%
+  \ifcsdef{meetingtitle@#1}%
+    {\hyperref[meeting:#1]{\textbf{Meeting~\ref{meeting:#1}:}~\csuse{meetingtitle@#1}}}%
+    {\textcolor{red}{[Unknown meeting '#1']}}%
+}
+
+
+% --- Active Task Command ---
+\newcommand{\activetask}[2][]{%
+    \bgroup
+    \TaskIsDonefalse \setkeys{task}{#1}%
+    \ifcsdef{tasktext@#2}{%
+        \ifTaskIsDone
+            \ifx\CurrentDailyDate\empty \PackageWarning{MyTasks}{activetask[done]...}\else\protected@write\@auxout{}{\string\@settaskdonestatus{\unexpanded{#2}}{\CurrentDailyDate}}\fi
+            \par\noindent
+            \textcolor{IconColor}{\faCalendarCheck}~%
+            \hypersetup{linkcolor=TaskDone}%
+            \hyperref[task:#2]{\textbf{Task \getrefnumber{task:#2}:}\textcolor{TaskLabel}{\texttt{\,[#2]}}~\textcolor{black}{\csuse{tasktext@#2}}}%
+            \par\vspace{1mm}%
+        \else
+            \addcontentsline{act}{section}{\protect\numberline{\bf\textcolor{magenta}{\getrefnumber{task:#2}}}\protect\textcolor{TaskLabel}{\protect\texttt{\space[#2]}}\space \csuse{tasktext@#2}}%
+            \par\noindent
+            \colorbox{ActiveTaskBackground}{%
+                \begin{minipage}{\linewidth-2\fboxsep}
+                    \textcolor{IconColor}{\faPlayCircle}~\textcolor{TaskActive}{\textbf{Active \ref{task:#2}:}}%
+                    \textcolor{TaskLabel}{\texttt{\,[#2]}}\newline\csuse{tasktext@#2}%
+                \end{minipage}%
+            }%
+            \par\vspace{1mm}%
+        \fi
+    }{\par\noindent\textcolor{red}{[Unknown task label for \texttt{\textbackslash activetask}: '#2']}\par}%
+    \egroup
+}
+
+% --- List of... Commands ---
 \newcommand{\listofactivetasks}{%
   \bgroup
   \renewcommand{\numberline}[1]{##1\quad}
   \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
   \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
-  \chapter{List of Active Tasks}
+  \chapter{List of Active Tasks}\label{activetasklist}
   \par\noindent{\Large\textbf{Total active tasks: \textcolor{red}{\thecountactive}}}\par\vspace{1.5em}
   \@starttoc{act}
   \egroup
@@ -344,13 +373,13 @@
   \renewcommand{\numberline}[1]{##1\quad}
   \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
   \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
-  \chapter{List of Todos}
+  \chapter{List of Todos}\label{todolist}
   \par\noindent{\Large\textbf{Total pending tasks: \textcolor{red}{\thecounttodos}}}\par\vspace{1.5em}
-  \ifnum\value{counttodosdo}>0 \subsection*{Do \normalfont\small(Urgent \& Important) - \thecounttodosdo\ task(s)} \@starttoc{tdo-do} \vspace{1em} \fi
-  \ifnum\value{counttodosdecide}>0 \subsection*{Decide \normalfont\small(Important, Not Urgent) - \thecounttodosdecide\ task(s)} \@starttoc{tdo-decide} \vspace{1em} \fi
-  \ifnum\value{counttodosdelegate}>0 \subsection*{Delegate \normalfont\small(Urgent, Not Important) - \thecounttodosdelegate\ task(s)} \@starttoc{tdo-delegate} \vspace{1em} \fi
-  \ifnum\value{counttodosdelete}>0 \subsection*{Delete \normalfont\small(Not Urgent, Not Important) - \thecounttodosdelete\ task(s)} \@starttoc{tdo-delete} \vspace{1em} \fi
-  \ifnum\value{counttodosna}>0 \subsection*{Others - \thecounttodosna\ task(s)} \@starttoc{tdo-na} \vspace{1em} \fi
+  \ifnum\value{counttodosdo}>0 \subsection*{\bf Do \normalfont\small\bf(Urgent \& Important) - \thecounttodosdo\ task(s)} \@starttoc{tdo-do} \vspace{1em} \fi
+  \ifnum\value{counttodosdecide}>0 \subsection*{\bf Decide \normalfont\small\bf(Important, Not Urgent) - \thecounttodosdecide\ task(s)} \@starttoc{tdo-decide} \vspace{1em} \fi
+  \ifnum\value{counttodosdelegate}>0 \subsection*{\bf Delegate \normalfont\small\bf(Urgent, Not Important) - \thecounttodosdelegate\ task(s)} \@starttoc{tdo-delegate} \vspace{1em} \fi
+  \ifnum\value{counttodosdelete}>0 \subsection*{\bf Delete \normalfont\small\bf(Not Urgent, Not Important) - \thecounttodosdelete\ task(s)} \@starttoc{tdo-delete} \vspace{1em} \fi
+  \ifnum\value{counttodosna}>0 \subsection*{\bf Others - \thecounttodosna\ task(s)} \@starttoc{tdo-na} \vspace{1em} \fi
   \egroup
 }
 
@@ -359,24 +388,40 @@
   \renewcommand{\numberline}[1]{##1\quad}
   \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1\textcolor{TaskDone}{##1\dotfill##2}\par}
   \renewcommand*\l@subsection[2]{\par\noindent\hspace{2em}\hangindent=3em\hangafter=1\textcolor{SubTaskDone}{##1\dotfill##2}\par}
-  \chapter{List of Done Tasks}
+  \chapter{List of Done Tasks}\label{donetasklist}
   \par\noindent{\Large\textbf{Total completed tasks: \textcolor{red}{\thecountdone}}}\par\vspace{1.5em}
   \@starttoc{odo}
   \egroup
 }
+
+\newcommand{\listofmeetings}{%
+  \bgroup
+  \renewcommand{\numberline}[1]{##1\quad}
+  \renewcommand*\l@section[2]{\par\noindent\hangindent=3em\hangafter=1{##1\dotfill##2}\par}
+  \chapter{List of Meetings}\label{meetinglist}
+  \par\noindent{\Large\textbf{Total meetings logged: \textcolor{red}{\thecountmeetings}}}\par\vspace{1.5em}
+  \ifnum\value{countmeetingsupcoming}>0 \subsection*{\bf \textcolor{MeetingUpcoming}{Upcoming} - \thecountmeetingsupcoming\ meeting(s)} \@starttoc{mtg-upcoming} \vspace{1em} \fi
+  \ifnum\value{countmeetingsheld}>0 \subsection*{\bf \textcolor{MeetingHeld}{Held} - \thecountmeetingsheld\ meeting(s)} \@starttoc{mtg-held} \vspace{1em} \fi
+  \ifnum\value{countmeetingscancelled}>0 \subsection*{\bf \textcolor{MeetingCancelled}{Cancelled} - \thecountmeetingscancelled\ meeting(s)} \@starttoc{mtg-cancelled} \vspace{1em} \fi
+  \ifnum\value{countmeetingsna}>0 \subsection*{\bf Others - \thecountmeetingsna\ meeting(s)} \@starttoc{mtg-na} \vspace{1em} \fi
+  \egroup
+}
+
 \makeatother
 
 
-% --- Main Document ---
 \begin{document}
 
 \title{Work Journal}
 \author{RG}
 
-\let\cleardoublepage\clearpage % Tufte-book specific tweak
+\let\cleardoublepage\clearpage
+
 \input{entries.tex}
+
 \listofactivetasks
 \listoftodos
+\listofmeetings
 \listofdonetodos
 
 \end{document}
