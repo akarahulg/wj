@@ -41,7 +41,7 @@
 \definecolor{MeetingCancelled}{HTML}{D32F2F}
 \definecolor{MeetingUpcoming}{HTML}{F57C00}
 \definecolor{TaskIgnore}{HTML}{999999} 
-\definecolor{TagColor}{HTML}{D81E5B} 
+\definecolor{TagColor}{HTML}{E53888} 
 
 \hypersetup{colorlinks=true, linkcolor=teal, urlcolor=cyan}
 
@@ -163,14 +163,16 @@
     \fi
 }
 
-%%% NEW: Helper command to print the tag if it exists
+%%% MODIFIED: Helper command to print multiple tags
 \newcommand{\@printtasktag}{%
     \ifUserProvidedTag
-        \textcolor{magenta}{\texttt{\,\#\TaskTag}}%
+        \@for\CurrentTag:=\TaskTag\do{%
+            \textcolor{TagColor}{\texttt{\space\#\CurrentTag}}%
+        }%
     \fi
 }
 
-%%% MODIFIED: @createmaintask to display the tag
+%%% MODIFIED: @createmaintask to handle multiple tags
 \newcommand{\@createmaintask}[4][]{%
     \bgroup
     \TaskIsDonefalse \TaskIsDoingfalse \TaskIsIgnoredfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse \UserProvidedTagfalse
@@ -190,8 +192,11 @@
         \phantomsection\label{task:\FullTaskLabel}
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#4}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
+        %%% MODIFIED: Loop through tags and write one aux entry for each
         \ifUserProvidedTag
-            \protected@write\@auxout{}{\string\addtasktotag{\TaskTag}{\FullTaskLabel}}
+            \@for\CurrentTag:=\TaskTag\do{%
+                \protected@write\@auxout{}{\string\addtasktotag{\CurrentTag}{\FullTaskLabel}}%
+            }%
         \fi
     \fi
     \def\markerForToc{}
@@ -211,18 +216,18 @@
         \ifUserProvidedDoneDate\marginnote{\textcolor{IconColor}{\faCalendarCheck}~\textcolor{magenta}{\bf \TaskDoneDate}}\fi
         \textcolor{IconColor}{\faCheck} ~\textcolor{TaskDone}{\textbf{Task \thetasknumber:}}%
         \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-        \@printtaskmarker\@printtasktag ~#4% %%% MODIFIED
+        \@printtaskmarker ~#4\@printtasktag
     \else\ifTaskIsIgnored 
         \textcolor{IconColor}{\faTimes}~\textcolor{TaskIgnore}{\textbf{Task \thetasknumber:}}%
         \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-        \@printtaskmarker\@printtasktag ~\textcolor{TaskIgnore}{\sout{#4}}% %%% MODIFIED
+        \@printtaskmarker ~\textcolor{TaskIgnore}{\sout{#4}}\@printtasktag
     \else
         \ifTaskIsDoing
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2\fboxsep}
                     \textcolor{IconColor}{\faPlayCircle}~\textcolor{TaskActive}{\textbf{Active ~\textcolor{TaskDefault}{Task \thetasknumber:}}}%
                     \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-                    \@printtaskmarker\@printtasktag \newline#4% %%% MODIFIED
+                    \@printtaskmarker \newline#4\@printtasktag
                 \end{minipage}%
             }%
         \else
@@ -230,7 +235,7 @@
                 \begin{minipage}{\linewidth-2\fboxsep}
                     \textcolor{IconColor}{\faDotCircle}~\textcolor{\taskcolor}{\textbf{Task \thetasknumber:}}%
                     \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-                    \@printtaskmarker\@printtasktag ~#4% %%% MODIFIED
+                    \@printtaskmarker ~#4\@printtasktag
                 \end{minipage}%
             }%
         \fi
@@ -239,7 +244,7 @@
     \egroup
 }
 
-%%% MODIFIED: @createsubtask to display the tag
+%%% MODIFIED: @createsubtask to handle multiple tags
 \newcommand{\@createsubtask}[3][]{%
     \bgroup
     \TaskIsDonefalse \TaskIsDoingfalse \TaskIsIgnoredfalse \UserProvidedLabelfalse \UserProvidedDoneDatefalse \UserProvidedMarkerfalse \UserProvidedTagfalse
@@ -258,8 +263,11 @@
         \phantomsection \label{task:\FullTaskLabel}
         \expandafter\gdef\csname tasktext@\FullTaskLabel\endcsname{#3}
         \def\labelForToc{\protect\textcolor{TaskLabel}{\protect\texttt{\space[\FullTaskLabel]}}}
+        %%% MODIFIED: Loop through tags and write one aux entry for each
         \ifUserProvidedTag
-            \protected@write\@auxout{}{\string\addtasktotag{\TaskTag}{\FullTaskLabel}}
+             \@for\CurrentTag:=\TaskTag\do{%
+                \protected@write\@auxout{}{\string\addtasktotag{\CurrentTag}{\FullTaskLabel}}%
+            }%
         \fi
     \fi
     \def\markerForToc{}
@@ -279,18 +287,18 @@
         \ifUserProvidedDoneDate\marginnote{\textcolor{IconColor}{\faCalendarCheck}~\textcolor{magenta}{\bf \TaskDoneDate}}\fi
         \textcolor{IconColor}{\faCheck}~\textcolor{SubTaskDone}{\textbf{\thesubtasknumber:}}%
         \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-        \@printtaskmarker\@printtasktag ~#3% %%% MODIFIED
+        \@printtaskmarker ~#3\@printtasktag
     \else\ifTaskIsIgnored 
         \textcolor{IconColor}{\faTimes}~\textcolor{TaskIgnore}{\textbf{\thesubtasknumber:}}%
         \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-        \@printtaskmarker\@printtasktag ~\textcolor{TaskIgnore}{\sout{#3}}% %%% MODIFIED
+        \@printtaskmarker ~\textcolor{TaskIgnore}{\sout{#3}}\@printtasktag
     \else
         \ifTaskIsDoing
             \colorbox{ActiveTaskBackground}{%
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
                     \textcolor{IconColor}{\faPlayCircle}~\textcolor{TaskActive}{\textbf{Active Task~ \textcolor{TaskDefault}{\thesubtasknumber}:}}%
                     \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-                    \@printtaskmarker\@printtasktag \newline#3% %%% MODIFIED
+                    \@printtaskmarker \newline#3\@printtasktag
                 \end{minipage}%
             }%
         \else
@@ -298,7 +306,7 @@
                 \begin{minipage}{\linewidth-2em-2\fboxsep}
                     \textcolor{IconColor}{\faDotCircle}~\textcolor{\taskcolor}{\textbf{\thesubtasknumber:}}%
                     \ifUserProvidedLabel\textcolor{TaskLabel}{\texttt{\,[\FullTaskLabel]}}\fi
-                    \@printtaskmarker\@printtasktag ~#3% %%% MODIFIED
+                    \@printtaskmarker ~#3\@printtasktag
                 \end{minipage}%
             }%
         \fi
@@ -493,6 +501,7 @@
 \let\cleardoublepage\clearpage
 
 \input{entries.tex}
+
 
 \listofactivetasks
 \listoftodos
